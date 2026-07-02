@@ -1,0 +1,15 @@
+{
+  "name": "KithFun — Your Campus. Your Game.",
+  "short_name": "KithFun",
+  "description": "Turn your campus into a game. Quests, factions, glory.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0e14",
+  "theme_color": "#0a0e14",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

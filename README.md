@@ -2,6 +2,8 @@
 
 **A gamified social metaverse for university campuses in Kenya.**
 
+🎮 **[Play the live demo](https://heman-ops.github.io/kithfun/)** — no install, works on any phone. Tap the map to move around.
+
 KithFun turns the campus into a living game board. Students explore a real map of their university, complete location-based quests, compete in factions — and connect with each other through collaborative "Dual Quests" instead of cold swipes.
 
 ## The Concept in One Line
@@ -18,9 +20,39 @@ KithFun turns the campus into a living game board. Students explore a real map o
 
 See [docs/PRODUCT_BRIEF.md](docs/PRODUCT_BRIEF.md) for the full product vision and [docs/MASTER_PROMPT.md](docs/MASTER_PROMPT.md) for the AI planning prompt that seeds architecture work.
 
+## Stack
+
+| Layer | Choice | Why |
+|---|---|---|
+| Client | Installable **PWA** (vanilla JS + [Leaflet](https://leafletjs.com)) | No Play Store fee/review, ~100KB payload for data-sensitive users, geolocation works great on Android Chrome |
+| Map | CARTO dark basemap tiles (OSM data) | Free with attribution, matches the dark terminal aesthetic |
+| Backend | **FastAPI** + SQLAlchemy | Python-first, async WebSockets for live leaderboards |
+| Database | SQLite (dev) / **Neon Postgres** (prod) | Neon free tier is permanent and scales to zero |
+| Hosting | **GitHub Pages** (demo) + **Render** free tier (full app) | $0/month |
+
+## Quickstart
+
+```powershell
+pip install -r requirements-dev.txt
+uvicorn app.main:app --app-dir backend --reload --port 8000
+# open http://localhost:8000 — API docs at /docs
+pytest backend/tests -q
+```
+
+Deployment guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+
+## MVP features (v0.1)
+
+- 🗺️ Dark campus map with geofenced quest zones
+- 📍 GPS check-ins (haversine-validated, once per quest per day)
+- 🦁 Four houses with balanced auto-assignment and a live faction leaderboard (WebSocket)
+- 🔥 Daily streaks (East Africa Time day boundaries)
+- 📲 Installable PWA with offline shell
+- 🕹️ Zero-backend **demo mode** (GitHub Pages) — tap-to-teleport, localStorage state
+
 ## Status
 
-🌱 **Concept stage** — product brief written, tech stack and MVP scope not yet decided.
+🚀 **MVP scaffold shipped** — playable demo live; Dual Quest matching, sub-arenas, and campus currency are next (see the product brief).
 
 ## Target Market
 

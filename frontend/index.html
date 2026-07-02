@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0e14" />
+  <meta name="description" content="KithFun — turn your campus into a game. Quests, factions, glory." />
+  <title>KithFun — Your Campus. Your Game.</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- HUD -->
+  <header class="hud">
+    <div class="hud-brand">
+      <span class="hud-logo">◆</span>
+      <span class="hud-title">KITH<span class="accent">FUN</span></span>
+      <span id="demo-badge" class="demo-badge hidden">DEMO</span>
+    </div>
+    <div class="hud-stats">
+      <div class="stat" title="Your points"><span class="stat-icon">⚡</span><span id="hud-points">0</span></div>
+      <div class="stat" title="Day streak"><span class="stat-icon">🔥</span><span id="hud-streak">0</span></div>
+      <div class="stat faction-chip" id="hud-faction" title="Your house">—</div>
+    </div>
+  </header>
+
+  <!-- Locate button -->
+  <button id="btn-locate" class="fab" title="Use my location">🎯</button>
+
+  <!-- Bottom sheet -->
+  <section class="sheet" id="sheet">
+    <div class="sheet-handle" id="sheet-handle"><div class="handle-bar"></div></div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="quests">Quests</button>
+      <button class="tab" data-tab="leaderboard">Leaderboard</button>
+    </nav>
+    <div class="tab-panel" id="panel-quests"><ul class="quest-list" id="quest-list"></ul></div>
+    <div class="tab-panel hidden" id="panel-leaderboard">
+      <div id="faction-board"></div>
+      <h3 class="board-heading">Top Players</h3>
+      <ol class="player-board" id="player-board"></ol>
+    </div>
+  </section>
+
+  <!-- Auth modal -->
+  <div class="modal-backdrop hidden" id="auth-modal">
+    <div class="modal">
+      <h2 class="modal-title">◆ JOIN THE GAME</h2>
+      <p class="modal-sub">Your campus is the board. Pick a handle.</p>
+      <input id="auth-username" type="text" placeholder="username" autocomplete="username" maxlength="30" />
+      <input id="auth-password" type="password" placeholder="password (6+ chars)" autocomplete="current-password" />
+      <p class="auth-error hidden" id="auth-error"></p>
+      <button class="btn-primary" id="btn-auth-submit">Enter</button>
+      <button class="btn-ghost" id="btn-auth-toggle">I already have an account</button>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast"></div>
+
+  <script>window.KITHFUN_CONFIG = { apiUrl: "" };</script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="app.js"></script>
+</body>
+</html>

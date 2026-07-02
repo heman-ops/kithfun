@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: kithfun
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/leaderboard
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # paste your Neon Postgres connection string in the Render dashboard
+      - key: CAMPUS_NAME
+        value: Demo Campus (University of Nairobi)
+      - key: CAMPUS_LAT
+        value: "-1.2795"
+      - key: CAMPUS_LNG
+        value: "36.8163"
