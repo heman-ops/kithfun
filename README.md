@@ -2,7 +2,9 @@
 
 **A gamified social metaverse for university campuses in Kenya.**
 
-🎮 **[Play the live demo](https://heman-ops.github.io/kithfun/)** — no install, works on any phone. Tap the map to move around.
+🎮 **[Play KithFun](https://kithfun.onrender.com)** — the real game: accounts, shared leaderboards, live faction battles. *(Free-tier host: first visit after idle takes ~1 min to wake.)*
+
+🕹️ **[Instant demo](https://heman-ops.github.io/kithfun/)** — single-player, no account, loads instantly. Tap the map to move around.
 
 KithFun turns the campus into a living game board. Students explore a real map of their university, complete location-based quests, compete in factions — and connect with each other through collaborative "Dual Quests" instead of cold swipes.
 

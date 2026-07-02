@@ -2,6 +2,9 @@
 
 Total hosting cost: **$0/month**.
 
+> **Current production:** https://kithfun.onrender.com (Render Frankfurt + Neon Postgres, deployed 2026-07-02)
+> **Instant demo:** https://heman-ops.github.io/kithfun/ (GitHub Pages, auto-deploys from `main`)
+
 ## 1. Live demo — GitHub Pages (already set up)
 
 Every push to `main` that touches `frontend/**` auto-deploys the PWA in **demo mode** to:

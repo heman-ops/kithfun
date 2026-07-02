@@ -46,6 +46,7 @@ html, body {
   font-size: 10px; font-weight: 700; letter-spacing: 1px;
   color: var(--warn); border: 1px solid var(--warn);
   padding: 1px 6px; border-radius: 6px;
+  text-decoration: none;
 }
 .hud-stats { display: flex; gap: 8px; align-items: center; }
 .stat {
