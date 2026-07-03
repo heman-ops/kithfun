@@ -1,5 +1,5 @@
 /* KithFun service worker: cache-first for the app shell, network-only for API. */
-const CACHE = "kithfun-v1";
+const CACHE = "kithfun-v2";
 const SHELL = [
   "./",
   "./index.html",

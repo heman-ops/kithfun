@@ -74,6 +74,14 @@
       });
     }
 
+    duals() { return this._req("/api/duals"); }
+    dualSuggestions() { return this._req("/api/duals/suggestions"); }
+    challenge(username) {
+      return this._req("/api/duals/challenge", { method: "POST", body: JSON.stringify({ username }) });
+    }
+    acceptDual(id) { return this._req(`/api/duals/${id}/accept`, { method: "POST" }); }
+    declineDual(id) { return this._req(`/api/duals/${id}/decline`, { method: "POST" }); }
+
     connectLive(onUpdate) {
       try {
         const base = API_BASE || location.origin;
@@ -183,6 +191,7 @@
       this.state.completed = { [day]: done };
       this.state.points += quest.points;
       this._save();
+      this._dualsOnCheckin(questId);
       const f = this._faction();
       return {
         ok: true, points_awarded: quest.points, total_points: this.state.points,
@@ -216,6 +225,96 @@
       return { campus_name: c.name, lat: c.lat, lng: c.lng, zoom: 16 };
     }
     connectLive() { /* no live socket in demo */ }
+
+    /* --- demo duals: a scripted rival keeps the feature alive single-player --- */
+
+    _duals() { return this.state.duals || []; }
+    _notifyDuals() { if (this.onDualsChanged) this.onDualsChanged(); }
+
+    async maybeSpawnIncomingChallenge() {
+      if (!this.state || this._duals().length) return;
+      const quest = (await this.quests())[2];
+      setTimeout(() => {
+        if (!this.state || this._duals().length) return;
+        this.state.duals = [{
+          id: 1, status: "pending", incoming: true, partner: "akinyi.designs",
+          quest: { id: quest.id, title: quest.title, icon: quest.icon, lat: quest.lat, lng: quest.lng },
+          bonus_points: 100, expires_epoch: null, you_done: false, partner_done: false,
+        }];
+        this._save();
+        this._notifyDuals();
+      }, 8000);
+    }
+
+    async duals() { return [...this._duals()].sort((a, b) => b.id - a.id); }
+
+    async dualSuggestions() {
+      const open = new Set(this._duals().filter((d) => ["pending", "active"].includes(d.status)).map((d) => d.partner));
+      return DEMO_RIVALS.filter((r) => !open.has(r.username)).slice(0, 4)
+        .map((r) => ({ username: r.username, faction_emblem: DEMO_FACTIONS[r.f].emblem }));
+    }
+
+    async challenge(username) {
+      const rival = DEMO_RIVALS.find((r) => r.username === username);
+      if (!rival) throw new Error("No player with that username.");
+      if (this._duals().some((d) => d.partner === username && ["pending", "active"].includes(d.status)))
+        throw new Error("You already have an open Dual Quest with this player.");
+      const quests = await this.quests();
+      const notDone = quests.filter((q) => !this._todayCompleted().includes(q.id));
+      if (!notDone.length) throw new Error("You two have completed every quest today — challenge again tomorrow.");
+      const quest = notDone[Math.floor(Math.random() * notDone.length)];
+      const dual = {
+        id: Date.now() % 1000000, status: "pending", incoming: false, partner: username,
+        quest: { id: quest.id, title: quest.title, icon: quest.icon, lat: quest.lat, lng: quest.lng },
+        bonus_points: 100, expires_epoch: null, you_done: false, partner_done: false,
+      };
+      this.state.duals = [...this._duals(), dual];
+      this._save();
+      setTimeout(() => {  // rival accepts a few seconds later
+        const d = this._duals().find((x) => x.id === dual.id);
+        if (d && d.status === "pending") {
+          d.status = "active";
+          d.expires_epoch = Math.floor(Date.now() / 1000) + 2 * 3600;
+          this._save();
+          this._notifyDuals();
+        }
+      }, 5000);
+      return dual;
+    }
+
+    async acceptDual(id) {
+      const d = this._duals().find((x) => x.id === id);
+      if (!d || d.status !== "pending") throw new Error("This challenge is no longer pending.");
+      d.status = "active";
+      d.expires_epoch = Math.floor(Date.now() / 1000) + 2 * 3600;
+      this._save();
+      return d;
+    }
+
+    async declineDual(id) {
+      const d = this._duals().find((x) => x.id === id);
+      if (!d || d.status !== "pending") throw new Error("This challenge is no longer pending.");
+      d.status = "declined";
+      this._save();
+      return d;
+    }
+
+    _dualsOnCheckin(questId) {
+      for (const d of this._duals()) {
+        if (d.status !== "active" || d.quest.id !== questId) continue;
+        d.you_done = true;
+        this._save();
+        setTimeout(() => {  // rival hustles over and completes their side
+          if (d.status !== "active") return;
+          d.partner_done = true;
+          d.status = "completed";
+          this.state.points += d.bonus_points;
+          this._save();
+          this._notifyDuals();
+          if (this.onDualCompleted) this.onDualCompleted(d);
+        }, 6000);
+      }
+    }
   }
 
   /* ---------------- App ---------------- */
@@ -330,7 +429,7 @@
     try {
       const res = await api.checkin(questId, myPos.lat, myPos.lng);
       toast(`🔥 ${res.message} Streak: ${res.streak}`);
-      await Promise.all([refreshHud(), refreshQuests(), refreshLeaderboard()]);
+      await Promise.all([refreshHud(), refreshQuests(), refreshLeaderboard(), refreshDuals()]);
     } catch (e) {
       toast(e.message, true);
     }
@@ -366,6 +465,101 @@
 
   async function refreshLeaderboard() {
     renderLeaderboard(await api.leaderboard());
+  }
+
+  /* ---------------- Dual Quests ---------------- */
+
+  function timeLeft(expiresEpoch) {
+    const s = expiresEpoch - Math.floor(Date.now() / 1000);
+    if (s <= 0) return "expired";
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+    return h > 0 ? `${h}h ${m}m left` : `${m}m left`;
+  }
+
+  function renderDuals(duals) {
+    const pendingIncoming = duals.filter((d) => d.status === "pending" && d.incoming).length;
+    const badge = $("allies-badge");
+    badge.textContent = pendingIncoming || "";
+    badge.classList.toggle("hidden", pendingIncoming === 0);
+
+    const list = $("dual-list");
+    list.innerHTML = "";
+    for (const d of duals) {
+      const li = document.createElement("li");
+      li.className = "dual-card" +
+        (d.status === "active" ? " active-dual" : "") +
+        (["expired", "declined"].includes(d.status) ? " muted" : "");
+
+      let head, sub, actions = "";
+      if (d.status === "pending" && d.incoming) {
+        head = `⚔️ <b>${d.partner}</b> challenged you!`;
+        sub = `${d.quest.icon} ${d.quest.title} · accept to start the 2h clock · +${d.bonus_points} each`;
+        actions = `<div class="dual-actions">
+          <button class="btn-accept" data-act="accept" data-id="${d.id}">ACCEPT</button>
+          <button class="btn-decline" data-act="decline" data-id="${d.id}">DECLINE</button></div>`;
+      } else if (d.status === "pending") {
+        head = `📨 Challenge sent to <b>${d.partner}</b>`;
+        sub = `${d.quest.icon} ${d.quest.title} · waiting for them to accept…`;
+      } else if (d.status === "active") {
+        head = `🎯 ${d.quest.icon} ${d.quest.title} <span class="spacer"></span>⏳ ${timeLeft(d.expires_epoch)}`;
+        sub = `with <b>${d.partner}</b> · you ${d.you_done ? '<span class="ok">✓</span>' : '<span class="wait">…</span>'} · them ${d.partner_done ? '<span class="ok">✓</span>' : '<span class="wait">…</span>'} · +${d.bonus_points} each`;
+      } else if (d.status === "completed") {
+        head = `🤝 Allies with <b>${d.partner}</b>`;
+        sub = `${d.quest.icon} ${d.quest.title} · +${d.bonus_points} pts each`;
+      } else {
+        head = d.status === "declined" ? `🚫 ${d.partner} — declined` : `⌛ ${d.partner} — expired`;
+        sub = `${d.quest.icon} ${d.quest.title}`;
+      }
+
+      li.innerHTML = `<div class="dual-head">${head}</div><div class="dual-sub">${sub}</div>${actions}`;
+      if (d.status === "active") {
+        li.style.cursor = "pointer";
+        li.addEventListener("click", (e) => {
+          if (!e.target.closest("button")) map.setView([d.quest.lat, d.quest.lng], 17);
+        });
+      }
+      list.appendChild(li);
+    }
+
+    list.querySelectorAll("button[data-act]").forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          const id = parseInt(btn.dataset.id, 10);
+          if (btn.dataset.act === "accept") {
+            await api.acceptDual(id);
+            toast("⚔️ Dual Quest ON — 2 hours, go go go!");
+          } else {
+            await api.declineDual(id);
+          }
+          await refreshDuals();
+        } catch (e) { toast(e.message, true); }
+      };
+    });
+  }
+
+  async function refreshDuals() {
+    if (!api.authed) return;
+    try {
+      renderDuals(await api.duals());
+      const sugg = await api.dualSuggestions();
+      $("suggestions").innerHTML = sugg.map((s) =>
+        `<button class="suggestion-chip" data-u="${s.username}">${s.faction_emblem} ${s.username}</button>`
+      ).join("");
+      $("suggestions").querySelectorAll(".suggestion-chip").forEach((chip) => {
+        chip.onclick = () => { $("challenge-input").value = chip.dataset.u; sendChallenge(); };
+      });
+    } catch { /* transient — poll will retry */ }
+  }
+
+  async function sendChallenge() {
+    const username = $("challenge-input").value.trim();
+    if (!username) return;
+    try {
+      await api.challenge(username);
+      $("challenge-input").value = "";
+      toast(`📨 Challenge sent to ${username}!`);
+      await refreshDuals();
+    } catch (e) { toast(e.message, true); }
   }
 
   /* ---------------- Auth flow ---------------- */
@@ -411,14 +605,26 @@
     if (!myPos) setMyPos(conf.lat, conf.lng);  // start avatar at campus center until located
     await refreshQuests();
     await refreshLeaderboard();
+    await refreshDuals();
     api.connectLive(renderLeaderboard);
-    if (!IS_DEMO) {
+    if (IS_DEMO) {
+      api.onDualsChanged = async () => {
+        await refreshDuals();
+        const incoming = (await api.duals()).find((d) => d.status === "pending" && d.incoming);
+        if (incoming) toast(`⚔️ ${incoming.partner} challenged you to a Dual Quest!`);
+      };
+      api.onDualCompleted = async (d) => {
+        toast(`🤝 Dual Quest complete with ${d.partner}! +${d.bonus_points} pts`);
+        await Promise.all([refreshHud(), refreshDuals()]);
+      };
+      api.maybeSpawnIncomingChallenge();
+    } else {
       navigator.geolocation?.watchPosition(
         (pos) => setMyPos(pos.coords.latitude, pos.coords.longitude),
         () => {}, { enableHighAccuracy: true }
       );
     }
-    setInterval(refreshLeaderboard, 30000);  // polling fallback
+    setInterval(() => { refreshHud(); refreshLeaderboard(); refreshDuals(); }, 30000);  // polling fallback
   }
 
   function initMap() {
@@ -451,10 +657,15 @@
       tab.onclick = () => {
         document.querySelectorAll(".tab").forEach((t) => t.classList.remove("active"));
         tab.classList.add("active");
-        $("panel-quests").classList.toggle("hidden", tab.dataset.tab !== "quests");
-        $("panel-leaderboard").classList.toggle("hidden", tab.dataset.tab !== "leaderboard");
+        for (const name of ["quests", "allies", "leaderboard"]) {
+          $(`panel-${name}`).classList.toggle("hidden", tab.dataset.tab !== name);
+        }
+        if (tab.dataset.tab === "allies") refreshDuals();
       };
     });
+
+    $("btn-challenge").onclick = sendChallenge;
+    $("challenge-input").addEventListener("keydown", (e) => e.key === "Enter" && sendChallenge());
 
     $("sheet-handle").onclick = () => $("sheet").classList.toggle("expanded");
   }

@@ -61,6 +61,10 @@ class CheckInOut(BaseModel):
     message: str
 
 
+class DualChallengeIn(BaseModel):
+    username: str = Field(min_length=3, max_length=30)
+
+
 class PlayerRank(BaseModel):
     username: str
     points: int

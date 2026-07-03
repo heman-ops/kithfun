@@ -1,3 +1,4 @@
+import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import game, schemas
+from . import duals, game, schemas
 from .auth import create_token, current_user, hash_password, verify_password
 from .config import CAMPUS_LAT, CAMPUS_LNG, CAMPUS_NAME
 from .db import Base, SessionLocal, engine, get_db
@@ -24,6 +25,7 @@ async def lifespan(_: FastAPI):
     yield
 
 
+log = logging.getLogger("kithfun")
 app = FastAPI(title="KithFun API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
@@ -96,20 +98,73 @@ async def checkin(
     except game.CheckInError as e:
         raise HTTPException(400, e.message)
 
+    # Never let a dual-credit failure swallow the successful check-in points.
+    try:
+        completed_duals = await anyio.to_thread.run_sync(duals.on_checkin, db, user, quest.id)
+    except Exception:
+        log.exception("dual credit failed for user=%s quest=%s", user.id, quest.id)
+        completed_duals = []
+
     await hub.broadcast({"type": "leaderboard", **game.leaderboard(db)})
+    message = f"+{result.points_awarded} pts for {user.faction.name}!"
+    if completed_duals:
+        partners = ", ".join(duals.serialize(d, user)["partner"] for d in completed_duals)
+        bonus = sum(d.bonus_points for d in completed_duals)
+        message += f" 🤝 Dual Quest complete with {partners}: +{bonus} bonus!"
     return {
         "ok": True,
         "points_awarded": result.points_awarded,
         "total_points": user.points,
         "streak": user.streak,
         "faction_points": user.faction.points,
-        "message": f"+{result.points_awarded} pts for {user.faction.name}!",
+        "message": message,
     }
 
 
 @app.get("/api/leaderboard", response_model=schemas.LeaderboardOut)
 def get_leaderboard(db: Session = Depends(get_db)):
     return game.leaderboard(db)
+
+
+# ---------- dual quests ----------
+
+@app.post("/api/duals/challenge")
+def dual_challenge(
+    body: schemas.DualChallengeIn,
+    user: User = Depends(current_user),
+    db: Session = Depends(get_db),
+):
+    try:
+        dual = duals.create_challenge(db, user, body.username)
+    except duals.DualError as e:
+        raise HTTPException(400, e.message)
+    return duals.serialize(dual, user)
+
+
+@app.get("/api/duals")
+def dual_list(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return [duals.serialize(d, user) for d in duals.my_duals(db, user)]
+
+
+@app.post("/api/duals/{dual_id}/accept")
+def dual_accept(dual_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    try:
+        return duals.serialize(duals.accept(db, user, dual_id), user)
+    except duals.DualError as e:
+        raise HTTPException(400, e.message)
+
+
+@app.post("/api/duals/{dual_id}/decline")
+def dual_decline(dual_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+    try:
+        return duals.serialize(duals.decline(db, user, dual_id), user)
+    except duals.DualError as e:
+        raise HTTPException(400, e.message)
+
+
+@app.get("/api/duals/suggestions")
+def dual_suggestions(user: User = Depends(current_user), db: Session = Depends(get_db)):
+    return [{"username": u.username, "faction_emblem": u.faction.emblem} for u in duals.suggestions(db, user)]
 
 
 @app.get("/api/map/config", response_model=schemas.MapConfigOut)

@@ -38,9 +38,19 @@
     <div class="sheet-handle" id="sheet-handle"><div class="handle-bar"></div></div>
     <nav class="tabs">
       <button class="tab active" data-tab="quests">Quests</button>
-      <button class="tab" data-tab="leaderboard">Leaderboard</button>
+      <button class="tab" data-tab="allies">Allies <span class="tab-badge hidden" id="allies-badge"></span></button>
+      <button class="tab" data-tab="leaderboard">Ranks</button>
     </nav>
     <div class="tab-panel" id="panel-quests"><ul class="quest-list" id="quest-list"></ul></div>
+    <div class="tab-panel hidden" id="panel-allies">
+      <div class="challenge-box">
+        <input id="challenge-input" type="text" placeholder="challenge a player by handle…" maxlength="30" />
+        <button id="btn-challenge" title="Send Dual Quest challenge">⚔️</button>
+      </div>
+      <div class="suggestions" id="suggestions"></div>
+      <ul class="dual-list" id="dual-list"></ul>
+      <p class="duals-hint">A Dual Quest gives you and a partner 2 hours to both reach the same spot. Pull it off → allies + <b>+100 pts each</b>.</p>
+    </div>
     <div class="tab-panel hidden" id="panel-leaderboard">
       <div id="faction-board"></div>
       <h3 class="board-heading">Top Players</h3>
